@@ -10,9 +10,9 @@ import (
 type TCPPeer struct {
 	connection net.Conn
 
-	// inbound is true when TCPTransport accept the connection
-	// inbound is false when TCPTransport send a connection
-	inbound bool
+	// outbound is true when TCPTransport send the connection
+	// outbound is false when TCPTransport received and accepted a connection
+	outbound bool
 }
 
 type TCPTransport struct {
@@ -50,6 +50,6 @@ func (t *TCPTransport) startAcceptLoop() {
 }
 
 func (t *TCPTransport) handleConnection(conn net.Conn) {
-	newTCPPeer := TCPPeer{ connection: conn, inbound: true}
-	fmt.Fprint(conn, "Hello!!")
+	newTCPPeer := TCPPeer{ connection: conn, outbound: false}
+	fmt.Fprint(newTCPPeer.connection, "Hello!!")
 }
