@@ -6,7 +6,12 @@ import (
 )
 
 func main() {
-	newTCPTransport := p2p.NewTCPTransport(":8080")
+	config := p2p.TCPTransportConfig{
+		ListenAddress: "localhost:8080",
+		Decoder: p2p.GOBDecoder{},
+		ShakeHandFunc: p2p.NoHandShakeFunc,
+	}
+	newTCPTransport := p2p.NewTCPTransport(config)
 	if err := newTCPTransport.ListenAndAccept(); err != nil {
 		log.Fatal(err)
 	}
