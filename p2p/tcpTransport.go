@@ -7,12 +7,21 @@ import (
 	"sync"
 )
 
+// TCPPeer is the remote peer in the tcp transport
 type TCPPeer struct {
+	// connection represent the underlying connection of the peer
 	connection net.Conn
 
 	// outbound is true when TCPTransport send the connection
 	// outbound is false when TCPTransport received and accepted a connection
 	outbound bool
+}
+
+func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
+	return &TCPPeer{
+		connection: conn,
+		outbound:   outbound,
+	}
 }
 
 type TCPTransport struct {
@@ -50,6 +59,6 @@ func (t *TCPTransport) startAcceptLoop() {
 }
 
 func (t *TCPTransport) handleConnection(conn net.Conn) {
-	newTCPPeer := TCPPeer{ connection: conn, outbound: false}
+	newTCPPeer := NewTCPPeer(conn, false)
 	fmt.Fprint(newTCPPeer.connection, "Hello!!")
 }
