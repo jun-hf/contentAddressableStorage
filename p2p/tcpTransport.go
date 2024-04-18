@@ -27,13 +27,18 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 type TCPTransport struct {
 	listenAddress string
 	listener      net.Listener
+	shakeHands    HandShakeFunc
+	decoder        Decoder
 
 	mu    sync.RWMutex
 	peers map[net.Addr]Peer
 }
 
 func NewTCPTransport(address string) *TCPTransport {
-	return &TCPTransport{listenAddress: address}
+	return &TCPTransport{
+		listenAddress: address,
+		shakeHands:    NoHandShakeFunc,
+	}
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
@@ -58,7 +63,16 @@ func (t *TCPTransport) startAcceptLoop() {
 	}
 }
 
+type temp struct {}
 func (t *TCPTransport) handleConnection(conn net.Conn) {
 	newTCPPeer := NewTCPPeer(conn, false)
-	fmt.Fprint(newTCPPeer.connection, "Hello!!")
+	if err := t.shakeHands(newTCPPeer); err != nil {
+		conn.Close() // reject connection when hand shake fails
+	}
+	msg := &temp{}
+	for {
+		if err := t.decoder.Decode(newTCPPeer, msg); err != nil {
+			fmt.Printf("TCP error unable to decode: %v\n", err)
+		}
+	}
 }
