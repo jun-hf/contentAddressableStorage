@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"sync"
 )
 
 // TCPPeer is the remote peer in the tcp transport
@@ -26,20 +25,22 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 
 type TCPTransportConfig struct {
 	ListenAddress string
-	Decoder Decoder
+	Decoder       Decoder
 	ShakeHandFunc HandShakeFunc
+	OnPeer func(Peer) error
 }
 
 type TCPTransport struct {
 	TCPTransportConfig
-	listener      net.Listener
-
-	mu    sync.RWMutex
-	peers map[net.Addr]Peer
+	listener  net.Listener
+	MessageCh chan Message
 }
 
 func NewTCPTransport(config TCPTransportConfig) *TCPTransport {
-	return &TCPTransport{ TCPTransportConfig: config }
+	return &TCPTransport{
+		TCPTransportConfig: config, 
+		MessageCh: make(chan Message),
+	}
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
@@ -64,7 +65,6 @@ func (t *TCPTransport) startAcceptLoop() {
 	}
 }
 
-type temp struct {}
 func (t *TCPTransport) handleConnection(conn net.Conn) {
 	newTCPPeer := NewTCPPeer(conn, false)
 	if err := t.ShakeHandFunc(newTCPPeer); err != nil {
@@ -72,10 +72,13 @@ func (t *TCPTransport) handleConnection(conn net.Conn) {
 		fmt.Printf("TCP error fail to validate hand shake: %v", err)
 		return
 	}
-	msg := &temp{}
+	fmt.Printf("Connected with %v\n", conn.RemoteAddr().String())
+	msg := Message{}
 	for {
-		if err := t.Decoder.Decode(conn, msg); err != nil {
+		if err := t.Decoder.Decode(conn, &msg); err != nil {
 			fmt.Printf("TCP error unable to decode: %v\n", err)
 		}
+		msg.Address = conn.RemoteAddr()
+		t.MessageCh <- msg
 	}
 }
