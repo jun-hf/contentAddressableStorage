@@ -16,6 +16,10 @@ type TCPPeer struct {
 	outbound bool
 }
 
+func (t TCPPeer) Close() error {
+	return t.connection.Close()
+}
+
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		connection: conn,
@@ -33,16 +37,19 @@ type TCPTransportConfig struct {
 type TCPTransport struct {
 	TCPTransportConfig
 	listener  net.Listener
-	MessageCh chan Message
+	messageCh chan Message
 }
 
 func NewTCPTransport(config TCPTransportConfig) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportConfig: config, 
-		MessageCh: make(chan Message),
+		messageCh: make(chan Message),
 	}
 }
 
+func (t *TCPTransport) Consume() <-chan Message {
+	return t.messageCh
+}
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
 	t.listener, err = net.Listen("tcp", t.ListenAddress)
@@ -79,6 +86,6 @@ func (t *TCPTransport) handleConnection(conn net.Conn) {
 			fmt.Printf("TCP error unable to decode: %v\n", err)
 		}
 		msg.Address = conn.RemoteAddr()
-		t.MessageCh <- msg
+		t.messageCh <- msg
 	}
 }

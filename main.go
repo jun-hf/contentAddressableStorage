@@ -16,7 +16,7 @@ func main() {
 	newTCPTransport := p2p.NewTCPTransport(config)
 	go func() {
 		for {
-			msg := <- newTCPTransport.MessageCh
+			msg := <- newTCPTransport.Consume()
 			fmt.Printf("Client message: %+v", msg)
 		}
 	}()
