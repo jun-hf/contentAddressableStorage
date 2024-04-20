@@ -66,13 +66,26 @@ func (s *Store) Read(key string) (io.Reader, error) {
 
 func (s *Store) Delete(key string) error {
 	keyPath := s.TransformPathFunc(key)
-	deleteAllContent := func (path string, info os.FileInfo, err error) error {
-		if err != nil {
+
+	return s.deleteFullPath(keyPath.Pathname)
+}
+
+func (s *Store) deleteFullPath(path string) error {
+	if string(path[0]) == "/" {
+		path = "." + path
+	}
+	for {
+		if path == "." {
+			return nil
+		}
+		if _, err := os.Stat(path); err != nil {
 			return err
 		}
-		return os.RemoveAll(path)
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+		path = filepath.Dir(path)
 	}
-	return filepath.Walk(keyPath.Pathname, deleteAllContent)
 }
 
 func (s *Store) writeStream(key string, r io.Reader) error {
