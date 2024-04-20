@@ -24,6 +24,7 @@ func TestPathTransformFunc(t *testing.T) {
 func TestStore(t *testing.T) {
 	storeOptions := StoreOpts{
 		CASPathTransformFunc,
+		"testDir",
 	}
 	store := NewStore(storeOptions)
 	data := "I am the new file"

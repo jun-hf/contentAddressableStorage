@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+var defaultRoot = "fileStorage"
 
 func CASPathTransformFunc(key string) KeyPath {
 	hash := sha1.Sum([]byte(key))
@@ -20,10 +23,10 @@ func CASPathTransformFunc(key string) KeyPath {
 	paths := make([]string, numBlock)
 
 	for i := 0; i < numBlock; i++ {
-		from, to := i*blockSize, i*blockSize + blockSize
+		from, to := i*blockSize, i*blockSize+blockSize
 		paths[i] = hashStr[from:to]
 	}
-	return KeyPath{ 
+	return KeyPath{
 		Pathname: strings.Join(paths, "/"),
 		Filename: hashStr,
 	}
@@ -39,12 +42,13 @@ func (k KeyPath) FullPath() string {
 
 type TransformPathFunc func(string) KeyPath
 
-func DefaultPathTransformFunc (key string) KeyPath {
-	return KeyPath{ Pathname: key, Filename: key }
+func DefaultPathTransformFunc(key string) KeyPath {
+	return KeyPath{Pathname: key, Filename: key}
 }
 
 type StoreOpts struct {
 	TransformPathFunc TransformPathFunc
+	Root              string
 }
 
 type Store struct {
@@ -52,22 +56,45 @@ type Store struct {
 }
 
 func NewStore(opts StoreOpts) *Store {
-	return &Store{ StoreOpts: opts }
+	if len(opts.Root) == 0 {
+		opts.Root = defaultRoot
+	}
+	if opts.TransformPathFunc == nil {
+		opts.TransformPathFunc = DefaultPathTransformFunc
+	}
+	return &Store{StoreOpts: opts}
+}
+
+func (s *Store) Has(key string) bool {
+	pathKey := s.TransformPathFunc(key)
+	filePath := s.BuildStoreFullFilePath(pathKey)
+
+	_, err := os.Stat(filePath)
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func (s *Store) Read(key string) (io.Reader, error) {
 	keyPath := s.TransformPathFunc(key)
-	data, err := os.ReadFile(keyPath.FullPath())
+	filePath := s.BuildStoreFullFilePath(keyPath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
 	return bytes.NewReader(data), nil
 }
 
+func (s *Store) BuildStoreFullFilePath(k KeyPath) string {
+	return filepath.Join(s.Root, k.Pathname, k.Filename)
+}
+
+func (s *Store) BuildStoreFullPath(k KeyPath) string {
+	return filepath.Join(s.Root, k.Pathname)
+}
+
 func (s *Store) Delete(key string) error {
 	keyPath := s.TransformPathFunc(key)
-
-	return s.deleteFullPath(keyPath.Pathname)
+	filePath := s.BuildStoreFullFilePath(keyPath)
+	return s.deleteFullPath(filePath)
 }
 
 func (s *Store) deleteFullPath(path string) error {
@@ -75,7 +102,7 @@ func (s *Store) deleteFullPath(path string) error {
 		path = "." + path
 	}
 	for {
-		if path == "." {
+		if path == s.Root {
 			return nil
 		}
 		if _, err := os.Stat(path); err != nil {
@@ -90,11 +117,11 @@ func (s *Store) deleteFullPath(path string) error {
 
 func (s *Store) writeStream(key string, r io.Reader) error {
 	keyPath := s.TransformPathFunc(key)
-	path := keyPath.Pathname
+	path := s.BuildStoreFullPath(keyPath)
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
 		return err
 	}
-	filename := keyPath.FullPath()
+	filename := s.BuildStoreFullFilePath(keyPath)
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
