@@ -27,8 +27,8 @@ func TestStore(t *testing.T) {
 	for i := 0; i < 88; i++ {
 		data := fmt.Sprintf("The data is %v", i)
 		src := strings.NewReader(data)
-		if err := store.writeStream(data, src); err != nil {
-			t.Fatalf("writeStream failed: %v\n", err)
+		if err := store.Write(data, src); err != nil {
+			t.Fatalf("Write failed: %v\n", err)
 		}
 	
 		r, err := store.Read(data)

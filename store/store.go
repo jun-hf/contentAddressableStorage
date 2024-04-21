@@ -53,6 +53,10 @@ func (s *Store) Has(key string) bool {
 	return !errors.Is(err, os.ErrNotExist)
 }
 
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
+}
+
 func (s *Store) Read(key string) (io.Reader, error) {
 	keyPath := s.TransformPathFunc(key)
 	filePath := s.BuildStoreFullFilePath(keyPath)
