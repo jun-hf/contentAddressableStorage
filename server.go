@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/gob"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 
@@ -47,6 +49,22 @@ func(f *FileServer) Start() error {
 	}
 	go f.dailOutbondServer()
 	f.loop()
+	return nil
+}
+type payload struct {}
+
+func (f *FileServer) broadcast(p payload) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	peerList := []io.Writer{}
+	for _, peer := range f.peers {
+		peerList = append(peerList, peer)
+	}
+	mw := io.MultiWriter(peerList...)
+	return gob.NewEncoder(mw).Encode(p)
+}
+
+func (f *FileServer) StoreFile(key string, r io.Reader) error {
 	return nil
 }
 

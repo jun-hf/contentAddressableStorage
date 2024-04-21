@@ -9,25 +9,23 @@ import (
 
 // TCPPeer is the remote peer in the tcp transport
 type TCPPeer struct {
-	// connection represent the underlying connection of the peer
-	connection net.Conn
+	// net.Conn represent the underlying connection 
+	// which in this case is a tcp
+	net.Conn
 
 	// outbound is true when TCPTransport send the connection
 	// outbound is false when TCPTransport received and accepted a connection
 	outbound bool
 }
 
-func (t TCPPeer) Close() error {
-	return t.connection.Close()
-}
-
-func (t TCPPeer) RemoteAddr() net.Addr {
-	return t.connection.RemoteAddr()
+func (t *TCPPeer) Send(b []byte) error {
+	_, err := t.Write(b)
+	return err
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
-		connection: conn,
+		Conn: conn,
 		outbound:   outbound,
 	}
 }

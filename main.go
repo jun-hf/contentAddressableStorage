@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/jun-hf/contentAddressableStorage/p2p"
 	"github.com/jun-hf/contentAddressableStorage/store"
@@ -35,4 +36,5 @@ func main() {
 		log.Fatal(s.Start())
 	}()
 	log.Fatal(s2.Start())
+	s2.StoreFile("I am here", strings.NewReader("inside file"))
 }
