@@ -8,5 +8,6 @@ type Peer interface {
 // Transport handles any communications between peers
 type Transport interface {
 	ListenAndAccept() error
-	Consume() <- chan Message
+	Consume() <-chan Message
+	Close() error
 }

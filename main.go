@@ -1,33 +1,36 @@
 package main
 
-// import (
-// 	"fmt"
-// 	"log"
+import (
+	"log"
+	"time"
 
-// 	"github.com/jun-hf/contentAddressableStorage/p2p"
-// )
-// func OnPeer(p p2p.Peer) error {
-// 	log.Println("Getting Peer in OnPeer")
-// 	p.Close()
-// 	return nil
-// }
+	"github.com/jun-hf/contentAddressableStorage/p2p"
+	"github.com/jun-hf/contentAddressableStorage/store"
+)
+func OnPeer(p p2p.Peer) error {
+	log.Println("Getting Peer in OnPeer")
+	p.Close()
+	return nil
+}
 
-// func main() {
-// 	config := p2p.TCPTransportConfig{
-// 		ListenAddress: "localhost:8080",
-// 		Decoder:       p2p.DefaultDecoder{},
-// 		ShakeHandFunc: p2p.NoHandShakeFunc,
-// 		OnPeer: OnPeer,
-// 	}
-// 	newTCPTransport := p2p.NewTCPTransport(config)
-// 	go func() {
-// 		for {
-// 			msg := <-newTCPTransport.Consume()
-// 			fmt.Printf("Client message: %+v\n", msg)
-// 		}
-// 	}()
-// 	if err := newTCPTransport.ListenAndAccept(); err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	select {}
-// }
+func main() {
+	config := p2p.TCPTransportConfig{
+		ListenAddress: "localhost:8080",
+		Decoder:       p2p.DefaultDecoder{},
+		ShakeHandFunc: p2p.NoHandShakeFunc,
+		OnPeer: OnPeer,
+	}
+	newTCPTransport := p2p.NewTCPTransport(config)
+	fileServerOpt := FileServerOpts{
+		fileStorageRoot: ":8080_directory",
+		transformPathFunc: store.CASPathTransformFunc,
+		serverTransport: newTCPTransport,
+	}
+	
+	fileServer := NewFileServer(fileServerOpt)
+	go func() {
+		time.Sleep(5 * time.Second)
+		fileServer.Quit()
+	}()
+	log.Fatal(fileServer.Start())
+}
