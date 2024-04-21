@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"bytes"
@@ -11,26 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 )
-
-var defaultRoot = "fileStorage"
-
-func CASPathTransformFunc(key string) KeyPath {
-	hash := sha1.Sum([]byte(key))
-	hashStr := hex.EncodeToString(hash[:])
-
-	blockSize := 5
-	numBlock := len(hashStr) / blockSize
-	paths := make([]string, numBlock)
-
-	for i := 0; i < numBlock; i++ {
-		from, to := i*blockSize, i*blockSize+blockSize
-		paths[i] = hashStr[from:to]
-	}
-	return KeyPath{
-		Pathname: strings.Join(paths, "/"),
-		Filename: hashStr,
-	}
-}
 
 type KeyPath struct {
 	Pathname, Filename string
@@ -83,18 +63,22 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	return bytes.NewReader(data), nil
 }
 
+func (s *Store) Delete(key string) error {
+	keyPath := s.TransformPathFunc(key)
+	filePath := s.BuildStoreFullFilePath(keyPath)
+	return s.deleteFullPath(filePath)
+}
+
+func (s *Store) ClearAll() error {
+	return os.RemoveAll(s.Root)
+}
+
 func (s *Store) BuildStoreFullFilePath(k KeyPath) string {
 	return filepath.Join(s.Root, k.Pathname, k.Filename)
 }
 
 func (s *Store) BuildStoreFullPath(k KeyPath) string {
 	return filepath.Join(s.Root, k.Pathname)
-}
-
-func (s *Store) Delete(key string) error {
-	keyPath := s.TransformPathFunc(key)
-	filePath := s.BuildStoreFullFilePath(keyPath)
-	return s.deleteFullPath(filePath)
 }
 
 func (s *Store) deleteFullPath(path string) error {
@@ -132,4 +116,24 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 	}
 	fmt.Printf("Written [%d] to file\n", n)
 	return nil
+}
+
+var defaultRoot = "fileStorage"
+
+func CASPathTransformFunc(key string) KeyPath {
+	hash := sha1.Sum([]byte(key))
+	hashStr := hex.EncodeToString(hash[:])
+
+	blockSize := 5
+	numBlock := len(hashStr) / blockSize
+	paths := make([]string, numBlock)
+
+	for i := 0; i < numBlock; i++ {
+		from, to := i*blockSize, i*blockSize+blockSize
+		paths[i] = hashStr[from:to]
+	}
+	return KeyPath{
+		Pathname: strings.Join(paths, "/"),
+		Filename: hashStr,
+	}
 }

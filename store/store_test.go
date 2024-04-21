@@ -1,6 +1,7 @@
-package main
+package store
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -22,29 +23,50 @@ func TestPathTransformFunc(t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
+	store := createStore()
+	for i := 0; i < 88; i++ {
+		data := fmt.Sprintf("The data is %v", i)
+		src := strings.NewReader(data)
+		if err := store.writeStream(data, src); err != nil {
+			t.Fatalf("writeStream failed: %v\n", err)
+		}
+	
+		r, err := store.Read(data)
+		if err != nil {
+			t.Fatalf("Read failed: %v\n", err)
+		}
+	
+		b, _ := io.ReadAll(r)
+		if string(b) != data {
+			t.Fatalf("wrong data: expected %v, got %v\n", data, string(b))
+		}
+	
+		if ok := store.Has(data); !ok {
+			t.Fatalf("Has failed key should exists\n")
+		}
+		
+		if err := store.Delete(data); err != nil {
+			t.Fatalf("Delete failed: %v\n", err)
+		}
+		
+		if ok := store.Has(data); ok {
+			t.Fatalf("Data should not existed: %v\n", data)
+		}
+	}
+	tearDown(t, store)
+}
+
+
+func tearDown(t *testing.T, s *Store) {
+	if err := s.ClearAll(); err != nil {
+		t.Fatalf("ClearAll failed: %v\n", err)
+	}
+}
+
+func createStore() *Store {
 	storeOptions := StoreOpts{
 		CASPathTransformFunc,
 		"testDir",
 	}
-	store := NewStore(storeOptions)
-	data := "I am the new file"
-	src := strings.NewReader(data)
-	if err := store.writeStream(data, src); err != nil {
-		t.Fatalf("writeStream failed: %v\n", err)
-	}
-
-	r, err := store.Read(data)
-	if err != nil {
-		t.Fatalf("Read failed: %v\n", err)
-	}
-	b, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(b) != data {
-		t.Fatalf("wrong data: expected %v, got %v\n", data, string(b))
-	}
-	if err := store.Delete(data); err != nil {
-		t.Fatalf("Delete failed: %v\n", err)
-	}
+	return NewStore(storeOptions)
 }
