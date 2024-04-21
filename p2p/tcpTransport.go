@@ -21,6 +21,10 @@ func (t TCPPeer) Close() error {
 	return t.connection.Close()
 }
 
+func (t TCPPeer) RemoteAddr() net.Addr {
+	return t.connection.RemoteAddr()
+}
+
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		connection: conn,
@@ -67,6 +71,15 @@ func (t *TCPTransport) ListenAndAccept() error {
 	return nil
 }
 
+func (t *TCPTransport) Dial(listenAddr string) error {
+	conn, err := net.Dial("tcp", listenAddr)
+	if err != nil {
+		return err
+	}
+	go t.handleConnection(conn, true)
+	return nil
+}
+
 func (t *TCPTransport) startAcceptLoop() {
 	for {
 		conn, err := t.listener.Accept()
@@ -77,23 +90,22 @@ func (t *TCPTransport) startAcceptLoop() {
 			log.Print(err)
 			continue
 		}
-		go t.handleConnection(conn)
+		go t.handleConnection(conn, false)
 	}
 }
 
-func (t *TCPTransport) handleConnection(conn net.Conn) {
+func (t *TCPTransport) handleConnection(conn net.Conn, outbound bool) {
 	var err error
 	defer func() {
 		conn.Close()
 		fmt.Printf("TCP error dropping connection: %v\n", err)
 	}()
-	newTCPPeer := NewTCPPeer(conn, false)
+	newTCPPeer := NewTCPPeer(conn, outbound)
 	if err = t.ShakeHandFunc(newTCPPeer); err != nil {
 		err = fmt.Errorf("failed hand shake: %v", err)
 		return
 	}
 	if t.OnPeer != nil {
-		fmt.Println("Inside peer")
 		if err = t.OnPeer(newTCPPeer); err != nil {
 			err = fmt.Errorf("failed OnPeer: %v", err)
 			return

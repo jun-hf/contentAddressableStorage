@@ -1,36 +1,38 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"time"
 
 	"github.com/jun-hf/contentAddressableStorage/p2p"
 	"github.com/jun-hf/contentAddressableStorage/store"
 )
-func OnPeer(p p2p.Peer) error {
-	log.Println("Getting Peer in OnPeer")
-	p.Close()
-	return nil
-}
 
-func main() {
+func createServer(listenAddr string, ports... string) *FileServer {
 	config := p2p.TCPTransportConfig{
-		ListenAddress: "localhost:8080",
+		ListenAddress: listenAddr,
 		Decoder:       p2p.DefaultDecoder{},
 		ShakeHandFunc: p2p.NoHandShakeFunc,
-		OnPeer: OnPeer,
 	}
 	newTCPTransport := p2p.NewTCPTransport(config)
 	fileServerOpt := FileServerOpts{
-		fileStorageRoot: ":8080_directory",
-		transformPathFunc: store.CASPathTransformFunc,
-		serverTransport: newTCPTransport,
+		FileStorageRoot: fmt.Sprintf("%sNetworkDir", listenAddr),
+		TransformPathFunc: store.CASPathTransformFunc,
+		ServerTransport: newTCPTransport,
+		OutboundServers: ports,
 	}
-	
-	fileServer := NewFileServer(fileServerOpt)
+
+	s := NewFileServer(fileServerOpt)
+	newTCPTransport.OnPeer = s.OnPeer
+	return s
+}
+
+func main() {
+	s := createServer(":8080")
+	s2 := createServer(":3000", ":8080")
+
 	go func() {
-		time.Sleep(5 * time.Second)
-		fileServer.Quit()
+		log.Fatal(s.Start())
 	}()
-	log.Fatal(fileServer.Start())
+	log.Fatal(s2.Start())
 }
