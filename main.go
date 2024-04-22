@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/jun-hf/contentAddressableStorage/p2p"
 	"github.com/jun-hf/contentAddressableStorage/store"
@@ -35,6 +36,16 @@ func main() {
 	go func() {
 		log.Fatal(s.Start())
 	}()
-	log.Fatal(s2.Start())
-	s2.StoreFile("I am here", strings.NewReader("inside file"))
+	time.Sleep(3 * time.Second)
+	
+	go func() {
+		log.Fatal(s2.Start())
+	} ()
+
+	time.Sleep(3 * time.Second)
+	if err := s2.StoreFile("I am here", strings.NewReader("inside file")); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("after store")
+	select {}
 }

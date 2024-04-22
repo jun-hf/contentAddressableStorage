@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/gob"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
 
@@ -51,28 +53,47 @@ func(f *FileServer) Start() error {
 	f.loop()
 	return nil
 }
-type payload struct {}
 
-func (f *FileServer) broadcast(p payload) error {
+func (f *FileServer) broadcast(p *payload) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	peerList := []io.Writer{}
+	peersList := make([]io.Writer, 0)
 	for _, peer := range f.peers {
-		peerList = append(peerList, peer)
+		peersList = append(peersList, peer)
 	}
-	mw := io.MultiWriter(peerList...)
+	mw := io.MultiWriter(peersList...)
 	return gob.NewEncoder(mw).Encode(p)
 }
 
+type payload struct {
+	From string
+	Data []byte
+	a A
+}
+
+type A struct {
+	
+}
+
 func (f *FileServer) StoreFile(key string, r io.Reader) error {
-	return nil
+	buf := new(bytes.Buffer)
+	tee := io.TeeReader(r, buf)
+	if err := f.fileStorage.Write(key, tee); err != nil {
+		return err
+	}
+	p := &payload{
+		From: f.serverTransport.Addr(),
+		Data: buf.Bytes(),
+	}
+	fmt.Printf("%+v\n", p)
+	return f.broadcast(p)
 }
 
 func (f *FileServer) OnPeer(p p2p.Peer) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.peers[p.RemoteAddr()] = p
-	fmt.Println(f.peers)
+	fmt.Printf("%v connected with %v\n",f.serverTransport.Addr(), f.peers)
 	return nil
 }
 
@@ -81,7 +102,6 @@ func (f *FileServer) Quit() {
 }
 
 func (f *FileServer) dailOutbondServer() {
-	fmt.Println(f.outboundServers)
 	for _, addr := range f.outboundServers {
 		if err := f.serverTransport.Dial(addr); err != nil {
 			fmt.Println(err)
@@ -98,7 +118,13 @@ func(f *FileServer) loop() {
 	for {
 		select {
 		case mes := <- f.serverTransport.Consume():
-			fmt.Println(mes)
+			fmt.Printf("\nMessage: %v from: %v\n", mes.Payload, mes.Address)
+			pay := payload{}
+			err := gob.NewDecoder(bytes.NewReader(mes.Payload)).Decode(&pay)
+			if err != nil {
+				log.Print(err)
+			}
+			fmt.Println(string(pay.Data))
 		case <- f.quitCh:
 			return
 		}

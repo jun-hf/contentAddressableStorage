@@ -58,6 +58,10 @@ func (t *TCPTransport) Consume() <-chan Message {
 	return t.messageCh
 }
 
+func (t *TCPTransport) Addr() string {
+	return t.listener.Addr().String()
+}
+
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
 	t.listener, err = net.Listen("tcp", t.ListenAddress)

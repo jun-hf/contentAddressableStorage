@@ -14,4 +14,5 @@ type Transport interface {
 	Consume() <-chan Message
 	Close() error
 	Dial(string) error
+	Addr() string
 }
