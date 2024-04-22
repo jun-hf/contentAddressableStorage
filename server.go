@@ -17,16 +17,16 @@ type FileServerOpts struct {
 	FileStorageRoot   string
 	TransformPathFunc store.TransformPathFunc
 	ServerTransport   p2p.Transport
-	OutboundServers []string
+	OutboundServers   []string
 }
 
 type FileServer struct {
 	fileStorage     *store.Store
 	serverTransport p2p.Transport
-	quitCh chan struct{}
+	quitCh          chan struct{}
 	outboundServers []string
 
-	mu sync.Mutex
+	mu    sync.Mutex
 	peers map[net.Addr]p2p.Peer
 }
 
@@ -39,13 +39,13 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 	return &FileServer{
 		fileStorage:     newStore,
 		serverTransport: opts.ServerTransport,
-		quitCh: make(chan struct{}),
+		quitCh:          make(chan struct{}),
 		outboundServers: opts.OutboundServers,
-		peers: make(map[net.Addr]p2p.Peer),
+		peers:           make(map[net.Addr]p2p.Peer),
 	}
 }
 
-func(f *FileServer) Start() error {
+func (f *FileServer) Start() error {
 	if err := f.serverTransport.ListenAndAccept(); err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func(f *FileServer) Start() error {
 	return nil
 }
 
-func (f *FileServer) broadcast(p *payload) error {
+func (f *FileServer) broadcast(p *Payload) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	peersList := make([]io.Writer, 0)
@@ -65,14 +65,14 @@ func (f *FileServer) broadcast(p *payload) error {
 	return gob.NewEncoder(mw).Encode(p)
 }
 
-type payload struct {
+type Payload struct {
 	From string
 	Data []byte
-	a A
+	A    A
 }
 
 type A struct {
-	
+	Inside string
 }
 
 func (f *FileServer) StoreFile(key string, r io.Reader) error {
@@ -81,9 +81,12 @@ func (f *FileServer) StoreFile(key string, r io.Reader) error {
 	if err := f.fileStorage.Write(key, tee); err != nil {
 		return err
 	}
-	p := &payload{
+	apple := A{Inside:"Hello"}
+	fmt.Println(apple)
+	p := &Payload{
 		From: f.serverTransport.Addr(),
 		Data: buf.Bytes(),
+		A:    apple,
 	}
 	fmt.Printf("%+v\n", p)
 	return f.broadcast(p)
@@ -93,7 +96,7 @@ func (f *FileServer) OnPeer(p p2p.Peer) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.peers[p.RemoteAddr()] = p
-	fmt.Printf("%v connected with %v\n",f.serverTransport.Addr(), f.peers)
+	fmt.Printf("%v connected with %v\n", f.serverTransport.Addr(), f.peers)
 	return nil
 }
 
@@ -110,22 +113,23 @@ func (f *FileServer) dailOutbondServer() {
 	}
 }
 
-func(f *FileServer) loop() {
+func (f *FileServer) loop() {
 	defer func() {
 		f.serverTransport.Close()
 		fmt.Println("Closed serverTransport")
-	} ()
+	}()
 	for {
 		select {
-		case mes := <- f.serverTransport.Consume():
+		case mes := <-f.serverTransport.Consume():
 			fmt.Printf("\nMessage: %v from: %v\n", mes.Payload, mes.Address)
-			pay := payload{}
+			pay := Payload{}
 			err := gob.NewDecoder(bytes.NewReader(mes.Payload)).Decode(&pay)
 			if err != nil {
 				log.Print(err)
 			}
 			fmt.Println(string(pay.Data))
-		case <- f.quitCh:
+			fmt.Printf("%+v\n", pay.A.Inside)
+		case <-f.quitCh:
 			return
 		}
 	}
