@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 )
 
 // TCPPeer is the remote peer in the tcp transport
@@ -16,6 +17,8 @@ type TCPPeer struct {
 	// outbound is true when TCPTransport send the connection
 	// outbound is false when TCPTransport received and accepted a connection
 	outbound bool
+
+	Wg sync.WaitGroup
 }
 
 func (t *TCPPeer) Send(b []byte) error {
@@ -120,7 +123,11 @@ func (t *TCPTransport) handleConnection(conn net.Conn, outbound bool) {
 			fmt.Printf("TCP error: at handleConnection unable to decode: %v\n", err)
 			return
 		}
-		msg.Address = conn.RemoteAddr()
+		msg.From = conn.RemoteAddr().String()
+		fmt.Println("Waiting til stream is done")
+		newTCPPeer.Wg.Add(1)
 		t.messageCh <- msg
+		newTCPPeer.Wg.Wait()
+		fmt.Println("Continue read loop")
 	}
 }

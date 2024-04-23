@@ -44,7 +44,7 @@ func main() {
 
 	time.Sleep(3 * time.Second)
 	if err := s2.StoreFile("I am here", strings.NewReader("inside file")); err != nil {
-		log.Fatal(err)
+		log.Printf("s2 StoreFile failed: %+v\n",err)
 	}
 	fmt.Println("after store")
 	select {}

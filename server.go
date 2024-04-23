@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"sync"
 
 	"github.com/jun-hf/contentAddressableStorage/p2p"
@@ -27,7 +26,7 @@ type FileServer struct {
 	outboundServers []string
 
 	mu    sync.Mutex
-	peers map[net.Addr]p2p.Peer
+	peers map[string]p2p.Peer
 }
 
 func NewFileServer(opts FileServerOpts) *FileServer {
@@ -41,7 +40,7 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 		serverTransport: opts.ServerTransport,
 		quitCh:          make(chan struct{}),
 		outboundServers: opts.OutboundServers,
-		peers:           make(map[net.Addr]p2p.Peer),
+		peers:           make(map[string]p2p.Peer),
 	}
 }
 
@@ -54,7 +53,7 @@ func (f *FileServer) Start() error {
 	return nil
 }
 
-func (f *FileServer) broadcast(p *Payload) error {
+func (f *FileServer) broadcast(p *Message) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	peersList := make([]io.Writer, 0)
@@ -65,37 +64,36 @@ func (f *FileServer) broadcast(p *Payload) error {
 	return gob.NewEncoder(mw).Encode(p)
 }
 
-type Payload struct {
-	From string
-	Data []byte
-	A    A
+type Message struct {
+	Payload any
 }
 
-type A struct {
-	Inside string
+type MessageStoreFile struct {
+	key string
 }
 
 func (f *FileServer) StoreFile(key string, r io.Reader) error {
 	buf := new(bytes.Buffer)
-	tee := io.TeeReader(r, buf)
-	if err := f.fileStorage.Write(key, tee); err != nil {
+	messg := Message{
+		Payload: MessageStoreFile{
+			key: key,
+		},
+	}
+	if err := gob.NewEncoder(buf).Encode(messg); err != nil {
 		return err
 	}
-	apple := A{Inside:"Hello"}
-	fmt.Println(apple)
-	p := &Payload{
-		From: f.serverTransport.Addr(),
-		Data: buf.Bytes(),
-		A:    apple,
+	for _, p := range f.peers {
+		if err := p.Send(buf.Bytes()); err != nil {
+			return err
+		}
 	}
-	fmt.Printf("%+v\n", p)
-	return f.broadcast(p)
+	return nil
 }
 
 func (f *FileServer) OnPeer(p p2p.Peer) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.peers[p.RemoteAddr()] = p
+	f.peers[p.RemoteAddr().String()] = p
 	fmt.Printf("%v connected with %v\n", f.serverTransport.Addr(), f.peers)
 	return nil
 }
@@ -121,14 +119,24 @@ func (f *FileServer) loop() {
 	for {
 		select {
 		case mes := <-f.serverTransport.Consume():
-			fmt.Printf("\nMessage: %v from: %v\n", mes.Payload, mes.Address)
-			pay := Payload{}
+			pay := Message{}
+			fmt.Println("Before decoding:")
 			err := gob.NewDecoder(bytes.NewReader(mes.Payload)).Decode(&pay)
 			if err != nil {
 				log.Print(err)
 			}
-			fmt.Println(string(pay.Data))
-			fmt.Printf("%+v\n", pay.A.Inside)
+			peer, ok := f.peers[mes.From]
+			if !ok {
+				panic("peer not found")
+			}
+			fmt.Printf("The message: %s\n", string(pay.Payload.([]byte)))
+			buf := make([]byte, 1000)
+			n, err := peer.Read(buf)
+			fmt.Print(string(buf[:n]))
+			if err != nil {
+				panic(err)
+			}
+			peer.(*p2p.TCPPeer).Wg.Done()
 		case <-f.quitCh:
 			return
 		}
