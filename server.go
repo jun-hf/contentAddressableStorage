@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/jun-hf/contentAddressableStorage/p2p"
 	"github.com/jun-hf/contentAddressableStorage/store"
@@ -90,6 +91,12 @@ func (f *FileServer) StoreFile(key string, r io.Reader) error {
 			return err
 		}
 	}
+	time.Sleep(3 * time.Second)
+	for _, p := range f.peers {
+		if err := p.Send([]byte("This is a large file")); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -100,29 +107,41 @@ func (f *FileServer) loop() {
 	}()
 	for {
 		select {
-		case mes := <-f.serverTransport.Consume():
-			pay := Message{}
+		case remoteMessage := <-f.serverTransport.Consume():
+			message := Message{}
 			fmt.Println("Before decoding:")
-			err := gob.NewDecoder(bytes.NewReader(mes.Payload)).Decode(&pay)
-			if err != nil {
-				log.Print(err)
+			if err := gob.NewDecoder(bytes.NewReader(remoteMessage.Payload)).Decode(&message); err != nil {
+				log.Println(err)
 			}
-			peer, ok := f.peers[mes.From]
-			if !ok {
-				panic("peer not found")
+			if err := f.handleMessage(remoteMessage.From, &message); err != nil {
+				log.Println(err)
 			}
-			fmt.Printf("%+v\n", pay.Payload)
-			// buf := make([]byte, 1000)
-			// n, err := peer.Read(buf)
-			// fmt.Print(string(buf[:n]))
-			// if err != nil {
-			// 	panic(err)
-			// }
-			peer.(*p2p.TCPPeer).Wg.Done()
 		case <-f.quitCh:
 			return
 		}
 	}
+}
+
+func (f *FileServer) handleMessage(from string, m *Message) error {
+	switch payload := m.Payload.(type) {
+	case MessageStoreFile:
+		return f.handleMessageStoreFile(from, payload)
+	}
+	return nil
+}
+
+func (f *FileServer) handleMessageStoreFile(from string, m MessageStoreFile) error {
+	peer, ok := f.peers[from]
+	if !ok {
+		panic("peer not found")
+	}
+	fmt.Println(m.Key)
+	if err := f.fileStorage.Write(m.Key, peer); err != nil {
+		peer.(*p2p.TCPPeer).Wg.Done()
+		return err
+	}
+	peer.(*p2p.TCPPeer).Wg.Done()
+	return nil
 }
 
 func (f *FileServer) OnPeer(p p2p.Peer) error {
