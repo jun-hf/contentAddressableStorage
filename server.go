@@ -11,6 +11,9 @@ import (
 	"github.com/jun-hf/contentAddressableStorage/p2p"
 	"github.com/jun-hf/contentAddressableStorage/store"
 )
+func init() {
+	gob.Register(MessageStoreFile{})
+}
 
 type FileServerOpts struct {
 	FileStorageRoot   string
@@ -69,14 +72,14 @@ type Message struct {
 }
 
 type MessageStoreFile struct {
-	key string
+	Key string
 }
 
 func (f *FileServer) StoreFile(key string, r io.Reader) error {
 	buf := new(bytes.Buffer)
 	messg := Message{
 		Payload: MessageStoreFile{
-			key: key,
+			Key: key,
 		},
 	}
 	if err := gob.NewEncoder(buf).Encode(messg); err != nil {
@@ -88,27 +91,6 @@ func (f *FileServer) StoreFile(key string, r io.Reader) error {
 		}
 	}
 	return nil
-}
-
-func (f *FileServer) OnPeer(p p2p.Peer) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.peers[p.RemoteAddr().String()] = p
-	fmt.Printf("%v connected with %v\n", f.serverTransport.Addr(), f.peers)
-	return nil
-}
-
-func (f *FileServer) Quit() {
-	close(f.quitCh)
-}
-
-func (f *FileServer) dailOutbondServer() {
-	for _, addr := range f.outboundServers {
-		if err := f.serverTransport.Dial(addr); err != nil {
-			fmt.Println(err)
-			continue
-		}
-	}
 }
 
 func (f *FileServer) loop() {
@@ -129,16 +111,37 @@ func (f *FileServer) loop() {
 			if !ok {
 				panic("peer not found")
 			}
-			fmt.Printf("The message: %s\n", string(pay.Payload.([]byte)))
-			buf := make([]byte, 1000)
-			n, err := peer.Read(buf)
-			fmt.Print(string(buf[:n]))
-			if err != nil {
-				panic(err)
-			}
+			fmt.Printf("%+v\n", pay.Payload)
+			// buf := make([]byte, 1000)
+			// n, err := peer.Read(buf)
+			// fmt.Print(string(buf[:n]))
+			// if err != nil {
+			// 	panic(err)
+			// }
 			peer.(*p2p.TCPPeer).Wg.Done()
 		case <-f.quitCh:
 			return
+		}
+	}
+}
+
+func (f *FileServer) OnPeer(p p2p.Peer) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.peers[p.RemoteAddr().String()] = p
+	fmt.Printf("%v connected with %v\n", f.serverTransport.Addr(), f.peers)
+	return nil
+}
+
+func (f *FileServer) Quit() {
+	close(f.quitCh)
+}
+
+func (f *FileServer) dailOutbondServer() {
+	for _, addr := range f.outboundServers {
+		if err := f.serverTransport.Dial(addr); err != nil {
+			fmt.Println(err)
+			continue
 		}
 	}
 }

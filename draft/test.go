@@ -10,11 +10,20 @@ import (
 type P struct {
 	X, Y, Z int
 	Name    string
+	A any
+}
+
+type Food struct {
+	Hello string
 }
 
 type Q struct {
 	X, Y *int32
 	Name string
+}
+
+func init() {
+	gob.Register(Food{})
 }
 
 // This example shows the basic usage of the package: Create an encoder,
@@ -28,11 +37,8 @@ func main() {
 	dec := gob.NewDecoder(&network) // Will read from network.
 
 	// Encode (send) some values.
-	err := enc.Encode(P{3, 4, 5, "Pythagoras"})
-	if err != nil {
-		log.Fatal("encode error:", err)
-	}
-	err = enc.Encode(P{1782, 1841, 1922, "Treehouse"})
+	a := Food{"kok"}
+	err := enc.Encode(P{3, 4, 5, "Pythagoras", a})
 	if err != nil {
 		log.Fatal("encode error:", err)
 	}
@@ -42,11 +48,6 @@ func main() {
 	err = dec.Decode(&q)
 	if err != nil {
 		log.Fatal("decode error 1:", err)
-	}
-	fmt.Printf("%q: {%d, %d}\n", q.Name, q.X, q.Y)
-	err = dec.Decode(&q)
-	if err != nil {
-		log.Fatal("decode error 2:", err)
 	}
 	fmt.Printf("%q: {%d, %d}\n", q.Name, q.X, q.Y)
 

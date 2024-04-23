@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"net"
+
 )
 
 // Peer represent the remote node in the network
