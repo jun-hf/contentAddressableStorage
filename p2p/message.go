@@ -7,5 +7,4 @@ var (
 type Message struct {
 	Payload []byte
 	From string
-	Stream bool
 }
