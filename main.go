@@ -43,9 +43,17 @@ func main() {
 	} ()
 
 	time.Sleep(3 * time.Second)
-	if err := s2.StoreFile("I am here", strings.NewReader("inside file")); err != nil {
+	if err := s2.Store("I am here", strings.NewReader("inside file")); err != nil {
 		log.Printf("s2 StoreFile failed: %+v\n",err)
 	}
-	fmt.Println("after store")
+	// _, err := s2.Get("I am here")
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	// res, err := io.ReadAll(r)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	// fmt.Println(string(res))
 	select {}
 }

@@ -53,7 +53,7 @@ func (s *Store) Has(key string) bool {
 	return !errors.Is(err, os.ErrNotExist)
 }
 
-func (s *Store) Write(key string, r io.Reader) error {
+func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
@@ -103,23 +103,23 @@ func (s *Store) deleteFullPath(path string) error {
 	}
 }
 
-func (s *Store) writeStream(key string, r io.Reader) error {
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	keyPath := s.TransformPathFunc(key)
 	path := s.BuildStoreFullPath(keyPath)
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
-		return err
+		return 0, err
 	}
 	filename := s.BuildStoreFullFilePath(keyPath)
 	file, err := os.Create(filename)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	n, err := io.Copy(file, r)
 	if err != nil {
-		return err
+		fmt.Println(err)
 	}
 	fmt.Printf("Written [%d] to file\n", n)
-	return nil
+	return n, nil
 }
 
 var defaultRoot = "fileStorage"

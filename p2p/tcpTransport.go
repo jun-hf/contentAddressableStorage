@@ -117,17 +117,21 @@ func (t *TCPTransport) handleConnection(conn net.Conn, outbound bool) {
 		}
 	}
 	fmt.Printf("Connected with %v\n", conn.RemoteAddr().String())
-	msg := Message{}
 	for {
+		msg := Message{}
 		if err := t.Decoder.Decode(conn, &msg); err != nil {
 			fmt.Printf("TCP error: at handleConnection unable to decode: %v\n", err)
 			return
 		}
 		msg.From = conn.RemoteAddr().String()
-		fmt.Println("Waiting til stream is done")
-		newTCPPeer.Wg.Add(1)
+		if msg.Stream {
+			newTCPPeer.Wg.Add(1)
+			fmt.Println("Incoming stream")
+			newTCPPeer.Wg.Wait()
+			fmt.Println("Done processing stream continue read loop")
+			continue
+		}
 		t.messageCh <- msg
-		newTCPPeer.Wg.Wait()
 		fmt.Println("Continue read loop")
 	}
 }
